@@ -59,24 +59,19 @@ handle_call(_Request, _From, State) ->
     {reply, Reply, State}.
 
 handle_cast({pub, Message}, #state{name = Name, queue = Q, clients = Clients, message_counter = Counter} = State) ->
-    error_logger:info_msg("~p  ~p ~n", [Clients, Q]),
     NewQ = maps:put(Counter, Message, Q),
     maps:map(fun(Pid,_V) -> send(Pid, Name, Message) end, Clients),
     %% send to subscribers
     {noreply, State#state{queue = NewQ, message_counter = Counter + 1}};
 
-handle_cast({sub, Client, 0}, #state{clients = Clients} = State) ->
-    {noreply, State#state{clients = Clients#{Client => 0}}};
+handle_cast({sub, Pid, 0}, #state{clients = Clients} = State) ->
+    {noreply, State#state{clients = Clients#{Pid => 0}}};
 
 handle_cast({sub, Client, Offset}, #state{name = Name, clients = Clients, queue = Q, message_counter = Counter} = State) ->
-    error_logger:info_msg("~p  ~p ~n", [Client, Offset]),
-    %% should implement better limits
     Keys = offset_limit(Counter, Offset),
-    Messages = maps:with(Keys, Q),
-    %error_logger:info_msg("messages by offset ~p~n", [Messages]),
+    Messages = [M || {_, M} <- maps:to_list(maps:with(Keys, Q))],
     send(Client, Name, Messages),
     {noreply, State#state{clients = Clients#{Client => 0}}};
-
 
 handle_cast(_Msg, State) ->
     {noreply, State}.
@@ -101,6 +96,8 @@ offset_limit(Counter, Offset) when Counter =< Offset ->
     
 send(Client, QueueName, Messages) ->
     M = #{<<"queue">> => QueueName, <<"messages">> => Messages},
-    Client ! M.
+%%    error_logger:info_msg("Messages ~p~n", [M]),
+    M1 = jiffy:encode(M),
+    Client ! {msg, M1}.
 
 

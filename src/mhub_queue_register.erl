@@ -49,7 +49,6 @@ handle_call({get, Queue}, _From, #state{queues = Q} = State) ->
 	      QPid ->
 		  QPid
 	  end,
-    error_logger:info_msg("queue pid ~p~n", [Pid]),
     {reply, Pid, State#state{queues = Q#{Queue => Pid}}};
 
 handle_call(_Request, _From, State) ->
@@ -59,6 +58,9 @@ handle_call(_Request, _From, State) ->
 handle_cast(_Msg, State) ->
     {noreply, State}.
 
+handle_info({'DOWN', _MonitorRef, _Type, QueuePID, _Info}, #state{queues = Q} = State) ->
+    NewQ = maps:remove(QueuePID, Q),
+    {noreply, State#state{queues = NewQ}};
 handle_info(_Info, State) ->
     error_logger:info_msg("Unexpeted message in register ~p~n", [_Info]),
     {noreply, State}.
