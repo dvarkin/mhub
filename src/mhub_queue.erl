@@ -65,17 +65,23 @@ handle_cast({pub, Message}, #state{name = Name, queue = Q, clients = Clients, me
     {noreply, State#state{queue = NewQ, message_counter = Counter + 1}};
 
 handle_cast({sub, Pid, 0}, #state{clients = Clients} = State) ->
+    erlang:monitor(process, Pid),
     {noreply, State#state{clients = Clients#{Pid => 0}}};
 
-handle_cast({sub, Client, Offset}, #state{name = Name, clients = Clients, queue = Q, message_counter = Counter} = State) ->
+handle_cast({sub, Pid, Offset}, #state{name = Name, clients = Clients, queue = Q, message_counter = Counter} = State) ->
+    erlang:monitor(process, Pid),
     Keys = offset_limit(Counter, Offset),
     Messages = [M || {_, M} <- maps:to_list(maps:with(Keys, Q))],
-    send(Client, Name, Messages),
-    {noreply, State#state{clients = Clients#{Client => 0}}};
+    send(Pid, Name, Messages),
+    {noreply, State#state{clients = Clients#{Pid => 0}}};
 
 handle_cast(_Msg, State) ->
     {noreply, State}.
 
+%% remove clients PID from subscribers
+handle_info({'DOWN', _MonitorRef, _Type, ClientPid, _Info}, #state{clients = Q} = State) ->
+    NewQ = maps:remove(ClientPid, Q),
+    {noreply, State#state{clients = NewQ}};
 handle_info(_Info, State) ->
     {noreply, State}.
 

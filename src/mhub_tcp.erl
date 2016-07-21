@@ -45,7 +45,7 @@ handle_info({tcp, Socket, Data}, State=#state{socket=Socket, transport=Transport
     self() ! {msg, R},
     {noreply, State, ?TIMEOUT};
 handle_info({msg, Message}, #state{socket = Socket, transport = Transport} = State ) ->
-%%    error_logger:info_msg("~p~n", [Message]),
+%%    error_logger:info_msg("Send from socket ~p~n", [Message]),
     Transport:send(Socket, Message),
     {noreply, State};
 handle_info({tcp_closed, _Socket}, State) ->

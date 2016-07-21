@@ -20,6 +20,8 @@
 -define(RESP2, <<"{\"queue\":\"queue1\",\"messages\":\"test message2\"}">>).
 -define(RESP3, <<"{\"queue\":\"queue1\",\"messages\":\"test message3\"}">>).
 
+-define(RESP_OFFSET, <<"\"ok\"{\"queue\":\"queue1\",\"messages\":[\"test message1\",\"test message2\"]}">>). %% DIRTY. 
+
 -include_lib("common_test/include/ct.hrl").
 
 %%--------------------------------------------------------------------
@@ -170,7 +172,7 @@ tcp_pub_sub_offset_test(_Config) ->
     ?OK = recv(Sock),
 
     gen_tcp:send(Sock1, ?SUB_OFFSET2),
-    ?OK = recv(Sock1),
+    ?RESP_OFFSET = recv(Sock1),
 
 
     gen_tcp:send(Sock, ?PUB3),
