@@ -29,7 +29,7 @@ TODO: Move port configuration to .config file
 
 ## Protocol Overview
 
-RxDB binary protocol is JSON based. 
+Mhub binary protocol is JSON based. 
 
 ### Actions
 
@@ -49,7 +49,7 @@ Queues creates autmaticly, with first "pub" or "sub" call.
 
 #### Subscribe with offset
 
-You can take previous messages from queue using **offset** key in subscribe call:
+You can take previous messages from queue using **offset** key in the subscribe call:
 
 Take newest 2 messages from queue:
 
