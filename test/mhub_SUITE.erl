@@ -10,20 +10,25 @@
 
 -compile(export_all).
 
+-define(OK, <<"\"ok\"">>).
+
 -define(PUB1, <<"{\"pub\":\"queue1\",\"message\":\"test message1\"}">>).
 -define(PUB2, <<"{\"pub\":\"queue1\",\"message\":\"test message2\"}">>).
 -define(PUB3, <<"{\"pub\":\"queue1\",\"message\":\"test message3\"}">>).
--define(SUB, <<"{\"sub\":\"queue1\"}">>).
--define(SUB_OFFSET2, <<"{\"sub\":\"queue1\",\"offset\":2}">>).
--define(SUB_OFFSET1, <<"{\"sub\":\"queue1\",\"offset\":1}">>).
 
--define(OK, <<"\"ok\"">>).
+-define(SUB, <<"{\"sub\":\"queue1\"}">>).
+
+-define(SUB_OFFSET1, <<"{\"sub\":\"queue1\",\"offset\":1}">>).
+-define(SUB_OFFSET2, <<"{\"sub\":\"queue1\",\"offset\":2}">>).
+-define(SUB_OFFSET_SIGNED, <<"{\"sub\":\"queue1\",\"offset\":-2}">>).
+
 -define(RESP1, <<"{\"queue\":\"queue1\",\"messages\":\"test message1\"}">>).
 -define(RESP2, <<"{\"queue\":\"queue1\",\"messages\":\"test message2\"}">>).
 -define(RESP3, <<"{\"queue\":\"queue1\",\"messages\":\"test message3\"}">>).
 
 -define(RESP_OFFSET, <<"{\"queue\":\"queue1\",\"messages\":[\"test message1\",\"test message2\"]}">>). 
 -define(RESP_OFFSET3, <<"{\"queue\":\"queue1\",\"messages\":[\"test message3\"]}">>). 
+
 
 -include_lib("common_test/include/ct.hrl").
 
@@ -205,11 +210,23 @@ tcp_pub_sub_offset_test(_Config) ->
     gen_tcp:close(Sock).
 
 udp_protocol_test_case(_Config) ->
-    ?OK = mhub_udp_client:send(?PUB1),
-    ?OK = mhub_udp_client:send(?PUB2),
-    ?RESP_OFFSET = mhub_udp_client:send(?SUB_OFFSET2),
-    ?OK = mhub_udp_client:send(?PUB3),
-    ?RESP_OFFSET3 = mhub_udp_client:send(?SUB_OFFSET1),
+    PUB1 = <<"{\"pub\":\"queue10\",\"message\":\"test message1\"}">>,
+    PUB2 = <<"{\"pub\":\"queue10\",\"message\":\"test message2\"}">>,
+    PUB3 = <<"{\"pub\":\"queue10\",\"message\":\"test message3\"}">>,
+
+    SUB_OFFSET1 = <<"{\"sub\":\"queue10\",\"offset\":1}">>,
+    SUB_OFFSET2 = <<"{\"sub\":\"queue10\",\"offset\":2}">>,
+    SUB_OFFSET_SIGNED = <<"{\"sub\":\"queue10\",\"offset\":-2}">>,
+    
+    RESP_OFFSET = <<"{\"queue\":\"queue10\",\"messages\":[\"test message1\",\"test message2\"]}">>,
+    RESP_OFFSET3 = <<"{\"queue\":\"queue10\",\"messages\":[\"test message3\"]}">>,
+
+    ?OK = mhub_udp_client:send(PUB1),
+    ?OK = mhub_udp_client:send(PUB2),
+    RESP_OFFSET = mhub_udp_client:send(SUB_OFFSET2),
+    ?OK = mhub_udp_client:send(PUB3),
+    RESP_OFFSET3 = mhub_udp_client:send(SUB_OFFSET1),
+    RESP_OFFSET = mhub_udp_client:send(SUB_OFFSET_SIGNED),
     ok.
 
 recv(Socket) ->

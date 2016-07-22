@@ -13,6 +13,8 @@
 %% API
 -export([start_link/1, pub/2, sub/2, sub/3]).
 
+-export([offset_limit/2]).
+
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
 	 terminate/2, code_change/3]).
@@ -41,8 +43,10 @@ sub(Queue, Client) ->
 
 -spec sub(Queue :: pid(), Client :: port(), Offset :: pos_integer()) -> ok.
 
-sub(Queue, Client, Offset) ->
-    gen_server:call(Queue, {sub, Client, Offset}).
+sub(Queue, Client, Offset) when is_integer(Offset) ->
+    gen_server:call(Queue, {sub, Client, Offset});
+sub(_Queue, _Client, _Offset) ->
+    #{<<"error">> => <<"offset should be a number!">>}.
 
 start_link(#{qname := Name, timeout := Timeout}) when Timeout > 0 ->
     gen_server:start_link(?MODULE, [Name, Timeout], []).
@@ -94,7 +98,16 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
-
+offset_limit(Counter, Offset) when Counter == 0 orelse Offset == 0 ->
+    [];
+offset_limit(Counter, Offset) when Offset < 0 ->
+    UnsignedOffset = abs(Offset),
+    case Counter > UnsignedOffset of
+	true ->
+	    lists:seq(0, abs(Offset) - 1);
+	false ->
+	    lists:seq(0, Counter)
+    end;
 offset_limit(Counter, Offset) when Counter > Offset ->
     lists:seq(Counter - Offset, Counter);
 offset_limit(Counter, Offset) when Counter =< Offset ->
