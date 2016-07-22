@@ -37,12 +37,12 @@ pub(Queue, Message) ->
 -spec sub(Queue :: pid(), Client :: port()) -> ok.
 
 sub(Queue, Client) ->
-    sub(Queue, Client, 0).
+    gen_server:cast(Queue, {sub, Client, 0}).
 
 -spec sub(Queue :: pid(), Client :: port(), Offset :: pos_integer()) -> ok.
 
 sub(Queue, Client, Offset) ->
-    gen_server:cast(Queue, {sub, Client, Offset}).
+    gen_server:call(Queue, {sub, Client, Offset}).
 
 start_link(#{qname := Name, timeout := Timeout}) when Timeout > 0 ->
     gen_server:start_link(?MODULE, [Name, Timeout], []).
@@ -54,6 +54,13 @@ start_link(#{qname := Name, timeout := Timeout}) when Timeout > 0 ->
 init([Name, Timeout]) ->
     {ok, #state{name = Name, timeout = Timeout, queue = #{}, clients = #{}, message_counter = 0}}.
 
+handle_call({sub, Pid, Offset}, _From, #state{name = Name, clients = Clients, queue = Q, message_counter = Counter} = State) ->
+    erlang:monitor(process, Pid),
+    Keys = offset_limit(Counter, Offset),
+    Messages = [M || {_, M} <- maps:to_list(maps:with(Keys, Q))],
+    Reply = make_message(Name, Messages),
+    {reply, Reply, State#state{clients = Clients#{Pid => 0}}};
+
 handle_call(_Request, _From, State) ->
     Reply = ok,
     {reply, Reply, State}.
@@ -61,24 +68,17 @@ handle_call(_Request, _From, State) ->
 handle_cast({pub, Message}, #state{name = Name, queue = Q, clients = Clients, message_counter = Counter} = State) ->
     NewQ = maps:put(Counter, Message, Q),
     maps:map(fun(Pid,_V) -> send(Pid, Name, Message) end, Clients),
-    %% send to subscribers
     {noreply, State#state{queue = NewQ, message_counter = Counter + 1}};
 
 handle_cast({sub, Pid, 0}, #state{clients = Clients} = State) ->
     erlang:monitor(process, Pid),
     {noreply, State#state{clients = Clients#{Pid => 0}}};
 
-handle_cast({sub, Pid, Offset}, #state{name = Name, clients = Clients, queue = Q, message_counter = Counter} = State) ->
-    erlang:monitor(process, Pid),
-    Keys = offset_limit(Counter, Offset),
-    Messages = [M || {_, M} <- maps:to_list(maps:with(Keys, Q))],
-    send(Pid, Name, Messages),
-    {noreply, State#state{clients = Clients#{Pid => 0}}};
 
 handle_cast(_Msg, State) ->
     {noreply, State}.
 
-%% remove clients PID from subscribers
+%% remove client's PID from subscribers
 handle_info({'DOWN', _MonitorRef, _Type, ClientPid, _Info}, #state{clients = Q} = State) ->
     NewQ = maps:remove(ClientPid, Q),
     {noreply, State#state{clients = NewQ}};
@@ -99,11 +99,13 @@ offset_limit(Counter, Offset) when Counter > Offset ->
     lists:seq(Counter - Offset, Counter);
 offset_limit(Counter, Offset) when Counter =< Offset ->
     lists:seq(0, Counter).
-    
-send(Client, QueueName, Messages) ->
-    M = #{<<"queue">> => QueueName, <<"messages">> => Messages},
-%%    error_logger:info_msg("Messages ~p~n", [M]),
-    M1 = jiffy:encode(M),
-    Client ! {msg, M1}.
+
+make_message(QueueName, Messages) ->
+    #{<<"queue">> => QueueName, <<"messages">> => Messages}.
+
+send(Client, QueueName, Message) ->
+    %% error_logger:info_msg("~p Messages ~p~n", [M, Client]),
+    M = make_message(QueueName, Message),
+    Client ! {msg, M}.
 
 

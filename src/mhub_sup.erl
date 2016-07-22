@@ -21,6 +21,15 @@ init([]) ->
 	  modules => [mhub_queue_register]
 	 },
 
+    MhubUDP =
+	#{id => mhub_udp,
+	  start => {mhub_udp, start_link, [4444]},
+	  restart => permanent,
+	  shutdown => 5000, 
+	  type => worker,
+	  modules => [mhub_udp]
+	 },
+
     MhubQueueSup = 
 	#{id => mhub_queue_sup,
 	  start => {mhub_queue_sup, start_link, []},
@@ -30,5 +39,5 @@ init([]) ->
 	  modules => [mhub_queue_sup]
 	 },
 
-    Procs = [MhubQueueRegister, MhubQueueSup],
+    Procs = [MhubQueueRegister, MhubUDP, MhubQueueSup],
     {ok, {{one_for_one, 1, 5}, Procs}}.

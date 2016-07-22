@@ -15,12 +15,15 @@
 -define(PUB3, <<"{\"pub\":\"queue1\",\"message\":\"test message3\"}">>).
 -define(SUB, <<"{\"sub\":\"queue1\"}">>).
 -define(SUB_OFFSET2, <<"{\"sub\":\"queue1\",\"offset\":2}">>).
+-define(SUB_OFFSET1, <<"{\"sub\":\"queue1\",\"offset\":1}">>).
+
 -define(OK, <<"\"ok\"">>).
 -define(RESP1, <<"{\"queue\":\"queue1\",\"messages\":\"test message1\"}">>).
 -define(RESP2, <<"{\"queue\":\"queue1\",\"messages\":\"test message2\"}">>).
 -define(RESP3, <<"{\"queue\":\"queue1\",\"messages\":\"test message3\"}">>).
 
--define(RESP_OFFSET, <<"\"ok\"{\"queue\":\"queue1\",\"messages\":[\"test message1\",\"test message2\"]}">>). %% DIRTY. 
+-define(RESP_OFFSET, <<"{\"queue\":\"queue1\",\"messages\":[\"test message1\",\"test message2\"]}">>). 
+-define(RESP_OFFSET3, <<"{\"queue\":\"queue1\",\"messages\":[\"test message3\"]}">>). 
 
 -include_lib("common_test/include/ct.hrl").
 
@@ -122,7 +125,11 @@ groups() ->
 %% @end
 %%--------------------------------------------------------------------
 all() -> 
-    [tcp_pub_sub_test1, tcp_pub_sub_test2, tcp_pub_sub_offset_test].
+    [tcp_pub_sub_test1,
+     tcp_pub_sub_test2,
+     tcp_pub_sub_offset_test,
+     udp_protocol_test_case
+    ].
 
 %%--------------------------------------------------------------------
 %% @spec TestCase() -> Info
@@ -133,32 +140,48 @@ all() ->
 tcp_pub_sub_test1(_Config) ->
     {ok, Sock} = gen_tcp:connect("localhost", 5555, [binary, {packet, 0}, {active, false}]),
     {ok, Sock1} = gen_tcp:connect("localhost", 5555, [binary, {packet, 0}, {active, false}]),
+
+    %% Subscribtion is sync operation
     gen_tcp:send(Sock1, ?SUB),
     ?OK = recv(Sock1),
+
+    timer:sleep(200),
     gen_tcp:send(Sock, ?PUB1),
     ?OK = recv(Sock),
+
     ?RESP1 = recv(Sock1),
-    gen_tcp:close(Sock).
+    gen_tcp:close(Sock),
+    gen_tcp:close(Sock1).
 
 tcp_pub_sub_test2(_Config) ->
     {ok, Sock} = gen_tcp:connect("localhost", 5555, [binary, {packet, 0}, {active, false}]),
     {ok, Sock1} = gen_tcp:connect("localhost", 5555, [binary, {packet, 0}, {active, false}]),
-    gen_tcp:send(Sock1, ?SUB),
-    ?OK = recv(Sock1),
 
+    %% Subscribtion is sync operation
+
+    gen_tcp:send(Sock1, ?SUB),
+
+    timer:sleep(200),
+    ?OK = recv(Sock1),
     gen_tcp:send(Sock, ?PUB1),
     ?OK = recv(Sock),
+
     ?RESP1 = recv(Sock1),
+
 
     gen_tcp:send(Sock, ?PUB2),
     ?OK = recv(Sock),
+
     ?RESP2 = recv(Sock1),
 
     gen_tcp:send(Sock, ?PUB3),
     ?OK = recv(Sock),
+
     ?RESP3 = recv(Sock1),
 
-    gen_tcp:close(Sock).
+    gen_tcp:close(Sock),
+    gen_tcp:close(Sock1).
+
 
 tcp_pub_sub_offset_test(_Config) ->
     {ok, Sock} = gen_tcp:connect("localhost", 5555, [binary, {packet, 0}, {active, false}]),
@@ -166,7 +189,6 @@ tcp_pub_sub_offset_test(_Config) ->
 
     gen_tcp:send(Sock, ?PUB1),
     ?OK = recv(Sock),
-
 
     gen_tcp:send(Sock, ?PUB2),
     ?OK = recv(Sock),
@@ -177,12 +199,18 @@ tcp_pub_sub_offset_test(_Config) ->
 
     gen_tcp:send(Sock, ?PUB3),
     ?OK = recv(Sock),
+
+    timer:sleep(200),
     ?RESP3 = recv(Sock1),
-
-
     gen_tcp:close(Sock).
 
-
+udp_protocol_test_case(_Config) ->
+    ?OK = mhub_udp_client:send(?PUB1),
+    ?OK = mhub_udp_client:send(?PUB2),
+    ?RESP_OFFSET = mhub_udp_client:send(?SUB_OFFSET2),
+    ?OK = mhub_udp_client:send(?PUB3),
+    ?RESP_OFFSET3 = mhub_udp_client:send(?SUB_OFFSET1),
+    ok.
 
 recv(Socket) ->
     case gen_tcp:recv(Socket, 0) of

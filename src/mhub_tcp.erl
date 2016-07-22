@@ -36,17 +36,22 @@ init(Ref, Socket, Transport, _Opts = []) ->
 			  ?TIMEOUT).
 
 handle_info({tcp, Socket, Data}, State=#state{socket=Socket, transport=Transport}) ->
+    %%    error_logger:info_msg("Socket receive msg: ~p~n", [Data]),
     Transport:setopts(Socket, [{active, once}]),
     R = try mhub:parse(Data, self()) of
 	    Result -> Result
 	catch 
-	    _ -> jiffy:encode(#{error => <<"Invalid JSON">>, received => Data})
+	    _ -> #{error => <<"Invalid JSON">>, received => Data}
 	end,
-    self() ! {msg, R},
+    Binary = jiffy:encode(R),
+    %%		error_logger:info_msg("Send from socket ~p ~p~n", [M, Binary]),
+    Transport:send(Socket, Binary),
     {noreply, State, ?TIMEOUT};
-handle_info({msg, Message}, #state{socket = Socket, transport = Transport} = State ) ->
-%%    error_logger:info_msg("Send from socket ~p~n", [Message]),
-    Transport:send(Socket, Message),
+
+handle_info({_Type, Message}, #state{socket = Socket, transport = Transport} = State ) when is_map(Message) ->
+    Binary = jiffy:encode(Message),
+%%    error_logger:info_msg("Send from socket ~p ~p~n", [M, Binary]),
+    Transport:send(Socket, Binary),
     {noreply, State};
 handle_info({tcp_closed, _Socket}, State) ->
     {stop, normal, State};
@@ -69,9 +74,3 @@ terminate(_Reason, _State) ->
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
-%% Internal.
-
-%% reverse_binary(B) when is_binary(B) ->
-%% 	[list_to_binary(lists:reverse(binary_to_list(
-%% 		binary:part(B, {0, byte_size(B)-2})
-%% 	))), "\r\n"].
