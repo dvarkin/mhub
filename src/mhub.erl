@@ -12,6 +12,7 @@
 -define(SUB, <<"sub">>).
 -define(MESSAGE, <<"message">>).
 -define(OFFSET, <<"offset">>).
+-define(MARKER, <<"marker">>).
 
 %% PROTOCOL
 -export([parse/2]).
@@ -37,6 +38,9 @@ protocol(#{?PUB := Queue, ?MESSAGE := Message}, _Client) ->
 protocol(#{?SUB := Queue, ?OFFSET := Offset}, Client) ->    
     Pid = mhub_queue_register:get(Queue),
     mhub_queue:sub(Pid, Client, Offset);
+protocol(#{?SUB := Queue, ?MARKER := Marker}, Client) ->    
+    Pid = mhub_queue_register:get(Queue),
+    mhub_queue:sub_marker(Pid, Client, Marker);
 protocol(#{?SUB := Queue}, Client) ->    
     Pid = mhub_queue_register:get(Queue),
     mhub_queue:sub(Pid, Client);

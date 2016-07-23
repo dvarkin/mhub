@@ -133,7 +133,8 @@ all() ->
     [tcp_pub_sub_test1,
      tcp_pub_sub_test2,
      tcp_pub_sub_offset_test,
-     udp_protocol_test_case
+     udp_protocol_test_case,
+     udp_protocol_market_test_case
     ].
 
 %%--------------------------------------------------------------------
@@ -228,6 +229,31 @@ udp_protocol_test_case(_Config) ->
     RESP_OFFSET3 = mhub_udp_client:send(SUB_OFFSET1),
     RESP_OFFSET = mhub_udp_client:send(SUB_OFFSET_SIGNED),
     ok.
+
+udp_protocol_market_test_case(_Config) ->
+    PUB1 = <<"{\"pub\":\"queue11\",\"message\":\"test message1\"}">>,
+    PUB2 = <<"{\"pub\":\"queue11\",\"message\":\"test message2\"}">>,
+    PUB3 = <<"{\"pub\":\"queue11\",\"message\":\"test message3\"}">>,
+    PUB4 = <<"{\"pub\":\"queue11\",\"message\":\"test message4\"}">>,
+    PUB5 = <<"{\"pub\":\"queue11\",\"message\":\"test message5\"}">>,
+
+    SUB_MARKER0 = <<"{\"sub\":\"queue11\",\"marker\":0}">>,
+    SUB_MARKER2 = <<"{\"sub\":\"queue11\",\"marker\":2}">>,
+    
+    RESP_OFFSET = <<"{\"queue\":\"queue11\",\"messages\":[\"test message1\",\"test message2\"]}">>,
+    RESP_OFFSET3 = <<"{\"queue\":\"queue11\",\"messages\":[\"test message3\"]}">>,
+
+    ?OK = mhub_udp_client:send(PUB1),
+    ?OK = mhub_udp_client:send(PUB2),
+    R  = mhub_udp_client:send(SUB_MARKER0),
+    #{<<"marker">> := 2} = jiffy:decode(R, [return_maps]),
+    ?OK = mhub_udp_client:send(PUB3),
+    ?OK = mhub_udp_client:send(PUB4),
+    ?OK = mhub_udp_client:send(PUB5),
+    R1  = mhub_udp_client:send(SUB_MARKER2),
+    #{<<"marker">> := 5} = jiffy:decode(R1, [return_maps]),
+    ok.
+
 
 recv(Socket) ->
     case gen_tcp:recv(Socket, 0) of

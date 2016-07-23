@@ -11,7 +11,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/1, pub/2, sub/2, sub/3]).
+-export([start_link/1, pub/2, sub/2, sub/3, sub_marker/3]).
 
 -export([offset_limit/2]).
 
@@ -41,12 +41,19 @@ pub(Queue, Message) ->
 sub(Queue, Client) ->
     gen_server:cast(Queue, {sub, Client, 0}).
 
--spec sub(Queue :: pid(), Client :: port(), Offset :: pos_integer()) -> ok.
+-spec sub(Queue :: pid(), Client :: port(), Offset :: pos_integer()) -> map().
 
 sub(Queue, Client, Offset) when is_integer(Offset) ->
     gen_server:call(Queue, {sub, Client, Offset});
 sub(_Queue, _Client, _Offset) ->
     #{<<"error">> => <<"offset should be a number!">>}.
+
+-spec sub_marker(Queue :: pid(), Client :: port(), Marker :: pos_integer()) -> map().
+
+sub_marker(Queue, Client, Marker) when Marker >= 0 ->
+    gen_server:call(Queue, {sub_marker, Client, Marker});
+sub_marker(_Queue, _Client, _Marker) ->
+    #{<<"error">> => <<"marker should be a positive number!">>}.
 
 start_link(#{qname := Name, timeout := Timeout}) when Timeout > 0 ->
     gen_server:start_link(?MODULE, [Name, Timeout], []).
@@ -59,11 +66,24 @@ init([Name, Timeout]) ->
     {ok, #state{name = Name, timeout = Timeout, queue = #{}, clients = #{}, message_counter = 0}}.
 
 handle_call({sub, Pid, Offset}, _From, #state{name = Name, clients = Clients, queue = Q, message_counter = Counter} = State) ->
-    erlang:monitor(process, Pid),
+    is_monitor(Pid, maps:is_key(Pid, Clients)),
     Keys = offset_limit(Counter, Offset),
     Messages = [M || {_, M} <- maps:to_list(maps:with(Keys, Q))],
     Reply = make_message(Name, Messages),
     {reply, Reply, State#state{clients = Clients#{Pid => 0}}};
+
+handle_call({sub_marker, Pid, Marker}, 
+	    _From, 
+	    #state{name = Name, 
+		   clients = Clients, 
+		   queue = Q, 
+		   message_counter = Counter} = State) when Marker < Counter ->
+    is_monitor(Pid, maps:is_key(Pid, Clients)),
+    Keys = lists:seq(Marker, Counter),
+    Messages = [M || {_, M} <- maps:to_list(maps:with(Keys, Q))],
+    Reply = make_message(Name, Messages, Counter),
+    {reply, Reply, State#state{clients = Clients#{Pid => 0}}};
+
 
 handle_call(_Request, _From, State) ->
     Reply = ok,
@@ -75,9 +95,8 @@ handle_cast({pub, Message}, #state{name = Name, queue = Q, clients = Clients, me
     {noreply, State#state{queue = NewQ, message_counter = Counter + 1}};
 
 handle_cast({sub, Pid, 0}, #state{clients = Clients} = State) ->
-    erlang:monitor(process, Pid),
+    is_monitor(Pid, maps:is_key(Pid, Clients)),
     {noreply, State#state{clients = Clients#{Pid => 0}}};
-
 
 handle_cast(_Msg, State) ->
     {noreply, State}.
@@ -98,6 +117,9 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
+
+-spec offset_limit(Counter :: pos_integer(), Counter :: integer()) -> [pos_integer()].
+
 offset_limit(Counter, Offset) when Counter == 0 orelse Offset == 0 ->
     [];
 offset_limit(Counter, Offset) when Offset < 0 ->
@@ -116,9 +138,17 @@ offset_limit(Counter, Offset) when Counter =< Offset ->
 make_message(QueueName, Messages) ->
     #{<<"queue">> => QueueName, <<"messages">> => Messages}.
 
+make_message(QueueName, Messages, Marker) ->
+    #{<<"queue">> => QueueName, <<"messages">> => Messages, <<"marker">> => Marker}.
+
 send(Client, QueueName, Message) ->
     %% error_logger:info_msg("~p Messages ~p~n", [M, Client]),
     M = make_message(QueueName, Message),
     Client ! {msg, M}.
 
+is_monitor(_Pid, true) ->
+    ok;
+is_monitor(Pid, false) ->
+    erlang:monitor(process, Pid).
+    
 
