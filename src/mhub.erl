@@ -10,6 +10,7 @@
 
 -define(PUB, <<"pub">>).
 -define(SUB, <<"sub">>).
+-define(GET, <<"get">>).
 -define(MESSAGE, <<"message">>).
 -define(OFFSET, <<"offset">>).
 -define(MARKER, <<"marker">>).
@@ -35,12 +36,12 @@ parse(Data, _Client) ->
 protocol(#{?PUB := Queue, ?MESSAGE := Message}, _Client) ->
     Pid = mhub_queue_register:get(Queue),
     mhub_queue:pub(Pid, Message);
-protocol(#{?SUB := Queue, ?OFFSET := Offset}, Client) ->    
+protocol(#{?GET := Queue, ?OFFSET := Offset}, Client) ->    
     Pid = mhub_queue_register:get(Queue),
-    mhub_queue:sub(Pid, Client, Offset);
-protocol(#{?SUB := Queue, ?MARKER := Marker}, Client) ->    
+    mhub_queue:get_offset(Pid, Client, Offset);
+protocol(#{?GET := Queue, ?MARKER := Marker}, Client) ->    
     Pid = mhub_queue_register:get(Queue),
-    mhub_queue:sub_marker(Pid, Client, Marker);
+    mhub_queue:get_marker(Pid, Client, Marker);
 protocol(#{?SUB := Queue}, Client) ->    
     Pid = mhub_queue_register:get(Queue),
     mhub_queue:sub(Pid, Client);

@@ -11,24 +11,7 @@
 -compile(export_all).
 
 -define(OK, <<"\"ok\"">>).
-
--define(PUB1, <<"{\"pub\":\"queue1\",\"message\":\"test message1\"}">>).
--define(PUB2, <<"{\"pub\":\"queue1\",\"message\":\"test message2\"}">>).
--define(PUB3, <<"{\"pub\":\"queue1\",\"message\":\"test message3\"}">>).
-
--define(SUB, <<"{\"sub\":\"queue1\"}">>).
-
--define(SUB_OFFSET1, <<"{\"sub\":\"queue1\",\"offset\":1}">>).
--define(SUB_OFFSET2, <<"{\"sub\":\"queue1\",\"offset\":2}">>).
--define(SUB_OFFSET_SIGNED, <<"{\"sub\":\"queue1\",\"offset\":-2}">>).
-
--define(RESP1, <<"{\"queue\":\"queue1\",\"messages\":\"test message1\"}">>).
--define(RESP2, <<"{\"queue\":\"queue1\",\"messages\":\"test message2\"}">>).
--define(RESP3, <<"{\"queue\":\"queue1\",\"messages\":\"test message3\"}">>).
-
--define(RESP_OFFSET, <<"{\"queue\":\"queue1\",\"messages\":[\"test message1\",\"test message2\"]}">>). 
--define(RESP_OFFSET3, <<"{\"queue\":\"queue1\",\"messages\":[\"test message3\"]}">>). 
-
+-define(DEBUG(Msg), error_logger:info_msg("~p: ~p: === ~p~n",[?MODULE, ?LINE, Msg])).
 
 -include_lib("common_test/include/ct.hrl").
 
@@ -144,70 +127,89 @@ all() ->
 %%--------------------------------------------------------------------
 
 tcp_pub_sub_test1(_Config) ->
+    PUB1 = <<"{\"pub\":\"queue1\",\"message\":\"test message1\"}">>,
+    SUB= <<"{\"sub\":\"queue1\"}">>,
+    RESPONSE = <<"{\"queue\":\"queue1\",\"messages\":\"test message1\",\"marker\":0}">>,
+
     {ok, Sock} = gen_tcp:connect("localhost", 5555, [binary, {packet, 0}, {active, false}]),
     {ok, Sock1} = gen_tcp:connect("localhost", 5555, [binary, {packet, 0}, {active, false}]),
 
     %% Subscribtion is sync operation
-    gen_tcp:send(Sock1, ?SUB),
+    gen_tcp:send(Sock1, SUB),
     ?OK = recv(Sock1),
 
     timer:sleep(200),
-    gen_tcp:send(Sock, ?PUB1),
+    gen_tcp:send(Sock, PUB1),
     ?OK = recv(Sock),
 
-    ?RESP1 = recv(Sock1),
+    RESPONSE = recv(Sock1),
     gen_tcp:close(Sock),
     gen_tcp:close(Sock1).
 
 tcp_pub_sub_test2(_Config) ->
+    PUB1= <<"{\"pub\":\"queue2\",\"message\":\"test message1\"}">>,
+    PUB2= <<"{\"pub\":\"queue2\",\"message\":\"test message2\"}">>,
+    PUB3= <<"{\"pub\":\"queue2\",\"message\":\"test message3\"}">>,
+    SUB= <<"{\"sub\":\"queue2\"}">>,
+    RESPONSE1 = <<"{\"queue\":\"queue2\",\"messages\":\"test message1\",\"marker\":0}">>,
+    RESPONSE2 = <<"{\"queue\":\"queue2\",\"messages\":\"test message2\",\"marker\":1}">>, 
+    RESPONSE3 = <<"{\"queue\":\"queue2\",\"messages\":\"test message3\",\"marker\":2}">>,
+   
     {ok, Sock} = gen_tcp:connect("localhost", 5555, [binary, {packet, 0}, {active, false}]),
     {ok, Sock1} = gen_tcp:connect("localhost", 5555, [binary, {packet, 0}, {active, false}]),
 
     %% Subscribtion is sync operation
 
-    gen_tcp:send(Sock1, ?SUB),
+    gen_tcp:send(Sock1, SUB),
 
     timer:sleep(200),
     ?OK = recv(Sock1),
-    gen_tcp:send(Sock, ?PUB1),
+    gen_tcp:send(Sock, PUB1),
     ?OK = recv(Sock),
 
-    ?RESP1 = recv(Sock1),
+    RESPONSE1 = recv(Sock1),
 
-
-    gen_tcp:send(Sock, ?PUB2),
+    gen_tcp:send(Sock, PUB2),
     ?OK = recv(Sock),
 
-    ?RESP2 = recv(Sock1),
+    RESPONSE2 = recv(Sock1),
 
-    gen_tcp:send(Sock, ?PUB3),
+    gen_tcp:send(Sock, PUB3),
     ?OK = recv(Sock),
 
-    ?RESP3 = recv(Sock1),
+    RESPONSE3 = recv(Sock1),
 
     gen_tcp:close(Sock),
     gen_tcp:close(Sock1).
 
 
 tcp_pub_sub_offset_test(_Config) ->
+    PUB1= <<"{\"pub\":\"queue3\",\"message\":\"test message1\"}">>,
+    PUB2= <<"{\"pub\":\"queue3\",\"message\":\"test message2\"}">>,
+    PUB3= <<"{\"pub\":\"queue3\",\"message\":\"test message3\"}">>,
+    GET_OFFSET2 = <<"{\"get\":\"queue3\",\"offset\":2}">>,
+
+    RESPONSE1 = <<"{\"queue\":\"queue3\",\"messages\":[\"test message1\",\"test message2\"],\"marker\":2}">>,
+    RESPONSE2 = <<"{\"queue\":\"queue3\",\"messages\":\"test message3\",\"marker\":2}">>,
+
     {ok, Sock} = gen_tcp:connect("localhost", 5555, [binary, {packet, 0}, {active, false}]),
     {ok, Sock1} = gen_tcp:connect("localhost", 5555, [binary, {packet, 0}, {active, false}]),
 
-    gen_tcp:send(Sock, ?PUB1),
+    gen_tcp:send(Sock, PUB1),
     ?OK = recv(Sock),
 
-    gen_tcp:send(Sock, ?PUB2),
+    gen_tcp:send(Sock, PUB2),
     ?OK = recv(Sock),
 
-    gen_tcp:send(Sock1, ?SUB_OFFSET2),
-    ?RESP_OFFSET = recv(Sock1),
+    gen_tcp:send(Sock1, GET_OFFSET2),
+    RESPONSE1 = recv(Sock1),
 
-
-    gen_tcp:send(Sock, ?PUB3),
+    gen_tcp:send(Sock, PUB3),
     ?OK = recv(Sock),
 
     timer:sleep(200),
-    ?RESP3 = recv(Sock1),
+    RESPONSE2 = recv(Sock1),
+
     gen_tcp:close(Sock).
 
 udp_protocol_test_case(_Config) ->
@@ -215,19 +217,20 @@ udp_protocol_test_case(_Config) ->
     PUB2 = <<"{\"pub\":\"queue10\",\"message\":\"test message2\"}">>,
     PUB3 = <<"{\"pub\":\"queue10\",\"message\":\"test message3\"}">>,
 
-    SUB_OFFSET1 = <<"{\"sub\":\"queue10\",\"offset\":1}">>,
-    SUB_OFFSET2 = <<"{\"sub\":\"queue10\",\"offset\":2}">>,
-    SUB_OFFSET_SIGNED = <<"{\"sub\":\"queue10\",\"offset\":-2}">>,
-    
-    RESP_OFFSET = <<"{\"queue\":\"queue10\",\"messages\":[\"test message1\",\"test message2\"]}">>,
-    RESP_OFFSET3 = <<"{\"queue\":\"queue10\",\"messages\":[\"test message3\"]}">>,
+    GET_OFFSET1 = <<"{\"get\":\"queue10\",\"offset\":1}">>,
+    GET_OFFSET2 = <<"{\"get\":\"queue10\",\"offset\":2}">>,
+    GET_OFFSET_SIGNED = <<"{\"get\":\"queue10\",\"offset\":-2}">>,
 
+    RESPONSE1 = <<"{\"queue\":\"queue10\",\"messages\":[\"test message1\",\"test message2\"],\"marker\":2}">>,
+    RESPONSE2 = <<"{\"queue\":\"queue10\",\"messages\":[\"test message3\"],\"marker\":3}">>,
+    RESPONSE3 = <<"{\"queue\":\"queue10\",\"messages\":[\"test message1\",\"test message2\"],\"marker\":3}">>,
+    
     ?OK = mhub_udp_client:send(PUB1),
     ?OK = mhub_udp_client:send(PUB2),
-    RESP_OFFSET = mhub_udp_client:send(SUB_OFFSET2),
+    RESPONSE1 = mhub_udp_client:send(GET_OFFSET2),
     ?OK = mhub_udp_client:send(PUB3),
-    RESP_OFFSET3 = mhub_udp_client:send(SUB_OFFSET1),
-    RESP_OFFSET = mhub_udp_client:send(SUB_OFFSET_SIGNED),
+    RESPONSE2  = mhub_udp_client:send(GET_OFFSET1),
+    RESPONSE3 = mhub_udp_client:send(GET_OFFSET_SIGNED),
     ok.
 
 udp_protocol_market_test_case(_Config) ->
@@ -237,20 +240,18 @@ udp_protocol_market_test_case(_Config) ->
     PUB4 = <<"{\"pub\":\"queue11\",\"message\":\"test message4\"}">>,
     PUB5 = <<"{\"pub\":\"queue11\",\"message\":\"test message5\"}">>,
 
-    SUB_MARKER0 = <<"{\"sub\":\"queue11\",\"marker\":0}">>,
-    SUB_MARKER2 = <<"{\"sub\":\"queue11\",\"marker\":2}">>,
+    GET_MARKER0 = <<"{\"get\":\"queue11\",\"marker\":0}">>,
+    GET_MARKER2 = <<"{\"get\":\"queue11\",\"marker\":2}">>,
     
-    RESP_OFFSET = <<"{\"queue\":\"queue11\",\"messages\":[\"test message1\",\"test message2\"]}">>,
-    RESP_OFFSET3 = <<"{\"queue\":\"queue11\",\"messages\":[\"test message3\"]}">>,
 
     ?OK = mhub_udp_client:send(PUB1),
     ?OK = mhub_udp_client:send(PUB2),
-    R  = mhub_udp_client:send(SUB_MARKER0),
+    R  = mhub_udp_client:send(GET_MARKER0),
     #{<<"marker">> := 2} = jiffy:decode(R, [return_maps]),
     ?OK = mhub_udp_client:send(PUB3),
     ?OK = mhub_udp_client:send(PUB4),
     ?OK = mhub_udp_client:send(PUB5),
-    R1  = mhub_udp_client:send(SUB_MARKER2),
+    R1  = mhub_udp_client:send(GET_MARKER2),
     #{<<"marker">> := 5} = jiffy:decode(R1, [return_maps]),
     ok.
 

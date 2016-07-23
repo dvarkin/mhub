@@ -11,7 +11,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/1, pub/2, sub/2, sub/3, sub_marker/3]).
+-export([start_link/1, pub/2, sub/2, get_offset/3, get_marker/3]).
 
 -export([offset_limit/2]).
 
@@ -41,18 +41,18 @@ pub(Queue, Message) ->
 sub(Queue, Client) ->
     gen_server:cast(Queue, {sub, Client, 0}).
 
--spec sub(Queue :: pid(), Client :: port(), Offset :: pos_integer()) -> map().
+-spec get_offset(Queue :: pid(), Client :: port(), Offset :: pos_integer()) -> map().
 
-sub(Queue, Client, Offset) when is_integer(Offset) ->
-    gen_server:call(Queue, {sub, Client, Offset});
-sub(_Queue, _Client, _Offset) ->
+get_offset(Queue, Client, Offset) when is_integer(Offset) ->
+    gen_server:call(Queue, {get_offset, Client, Offset});
+get_offset(_Queue, _Client, _Offset) ->
     #{<<"error">> => <<"offset should be a number!">>}.
 
--spec sub_marker(Queue :: pid(), Client :: port(), Marker :: pos_integer()) -> map().
+-spec get_marker(Queue :: pid(), Client :: port(), Marker :: pos_integer()) -> map().
 
-sub_marker(Queue, Client, Marker) when Marker >= 0 ->
-    gen_server:call(Queue, {sub_marker, Client, Marker});
-sub_marker(_Queue, _Client, _Marker) ->
+get_marker(Queue, Client, Marker) when Marker >= 0 ->
+    gen_server:call(Queue, {get_marker, Client, Marker});
+get_marker(_Queue, _Client, _Marker) ->
     #{<<"error">> => <<"marker should be a positive number!">>}.
 
 start_link(#{qname := Name, timeout := Timeout}) when Timeout > 0 ->
@@ -65,14 +65,14 @@ start_link(#{qname := Name, timeout := Timeout}) when Timeout > 0 ->
 init([Name, Timeout]) ->
     {ok, #state{name = Name, timeout = Timeout, queue = #{}, clients = #{}, message_counter = 0}}.
 
-handle_call({sub, Pid, Offset}, _From, #state{name = Name, clients = Clients, queue = Q, message_counter = Counter} = State) ->
+handle_call({get_offset, Pid, Offset}, _From, #state{name = Name, clients = Clients, queue = Q, message_counter = Counter} = State) ->
     is_monitor(Pid, maps:is_key(Pid, Clients)),
     Keys = offset_limit(Counter, Offset),
     Messages = [M || {_, M} <- maps:to_list(maps:with(Keys, Q))],
-    Reply = make_message(Name, Messages),
+    Reply = make_message(Name, Messages, Counter),
     {reply, Reply, State#state{clients = Clients#{Pid => 0}}};
 
-handle_call({sub_marker, Pid, Marker}, 
+handle_call({get_marker, Pid, Marker}, 
 	    _From, 
 	    #state{name = Name, 
 		   clients = Clients, 
@@ -91,7 +91,7 @@ handle_call(_Request, _From, State) ->
 
 handle_cast({pub, Message}, #state{name = Name, queue = Q, clients = Clients, message_counter = Counter} = State) ->
     NewQ = maps:put(Counter, Message, Q),
-    maps:map(fun(Pid,_V) -> send(Pid, Name, Message) end, Clients),
+    maps:map(fun(Pid,_V) -> send(Pid, Name, Message, Counter) end, Clients),
     {noreply, State#state{queue = NewQ, message_counter = Counter + 1}};
 
 handle_cast({sub, Pid, 0}, #state{clients = Clients} = State) ->
@@ -135,15 +135,12 @@ offset_limit(Counter, Offset) when Counter > Offset ->
 offset_limit(Counter, Offset) when Counter =< Offset ->
     lists:seq(0, Counter).
 
-make_message(QueueName, Messages) ->
-    #{<<"queue">> => QueueName, <<"messages">> => Messages}.
-
 make_message(QueueName, Messages, Marker) ->
     #{<<"queue">> => QueueName, <<"messages">> => Messages, <<"marker">> => Marker}.
 
-send(Client, QueueName, Message) ->
+send(Client, QueueName, Message, Marker) ->
     %% error_logger:info_msg("~p Messages ~p~n", [M, Client]),
-    M = make_message(QueueName, Message),
+    M = make_message(QueueName, Message, Marker),
     Client ! {msg, M}.
 
 is_monitor(_Pid, true) ->
