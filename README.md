@@ -36,7 +36,7 @@ Mhub binary protocol is JSON based.
 
 #### Publishing messages to queue
 
-Queues creates autmaticly, with first "pub" or "sub" call.
+Queues creates autmaticly, after first "pub", "sub" or "get" call came.
 
        {
        "pub": "queue1","message": "Test Messge1"
@@ -46,7 +46,7 @@ Queues creates autmaticly, with first "pub" or "sub" call.
 
        "ok"
 
-#### Subscribe to new messages (async push via TCP)
+#### Subscribe for new messages (async push via TCP)
 
      {
      "sub":"queue1"
@@ -67,7 +67,7 @@ TODO: improve error and information format in response
 
 #### Subscribe with **offset**
 
-You can take previous messages from queue using **offset** key in the subscribe call:
+You can take previous messages from queue using **offset** key in the *get** call. 
 
 Take newest 2 messages from queue:
 
@@ -93,9 +93,11 @@ Take oldes 2 messages from head of queue:
     "queue":"queue1","messages":["1","2"],"marker":5
     }
 
+TCP clients will automaticly subscribed for new messages. 
+
 #### Subscribe with **marker**
 
-All messages in queue are strong ordered. You can get older messages and automaticly subscribe to new messages (or pulling in case of UDP) starting from particular position using **marker**.
+All messages in queue are strong ordered. You can get older messages starting from particular position using **marker**.
 
     {
     "get": "queue1","marker": 2
@@ -115,5 +117,7 @@ In response, server will include the number of current last number of messages i
     "marker":5
     }
 
-So you can use this *marker* position to pull next messages from the queue in new sessions. This is convinient way to pulling messages through UDP, or after reconnections of TCP clients. 
+TCP clients will automaticly subscribed for new messages. 
+
+So you can use this *marker* position to pull next messages from the queue in new sessions. This is convinient way to pulling messages through UDP, or after reconnections at TCP clients. 
 
