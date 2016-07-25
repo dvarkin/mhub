@@ -2,7 +2,8 @@
 %%% @author Dmitry Omelechko <dvarkin@gmail.com>
 %%% @copyright (C) 2016, Dmitry Omelechko
 %%% @doc
-%%%
+%%% Main Queue process. Contain all messages of the queue
+%%% Attantion - queues are not cleared!!!
 %%% @end
 %%% Created : 21 Jul 2016 by Dmitry Omelechko <dvarkin@gmail.com>
 %%%-------------------------------------------------------------------
@@ -31,22 +32,54 @@
 %%% API
 %%%===================================================================
 
+%%--------------------------------------------------------------------
+%% @doc
+%% Publish new message to queue. 
+%% @spec pub(Queue :: pid(), Message :: binary()) -> ok
+%% @end
+%%--------------------------------------------------------------------
+
 -spec pub(Queue :: pid(), Message :: binary()) -> ok.
 
 pub(Queue, Message) ->
     gen_server:cast(Queue, {pub, Message}).
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Subscribes to new messages from Queue. Actual for TCP clients. 
+%% @spec sub(Queue :: pid(), Client :: port()) -> ok
+%% @end
+%%--------------------------------------------------------------------
 
 -spec sub(Queue :: pid(), Client :: port()) -> ok.
 
 sub(Queue, Client) ->
     gen_server:cast(Queue, {sub, Client, 0}).
 
--spec get_offset(Queue :: pid(), Client :: port(), Offset :: pos_integer()) -> map().
+%%--------------------------------------------------------------------
+%% @doc 
+%% Get messages with Offset. 
+%% Offset may be positive or negative number. 
+%% If offset is positive - messages will be counted from tail. 
+%% If offset is negative - messages will be counted from head. 
+%% @spec get_offset(Queue :: pid(), Client :: port(), Offset :: integer()) -> map()
+%% @end
+%%--------------------------------------------------------------------
+
+-spec get_offset(Queue :: pid(), Client :: port(), Offset :: integer()) -> map().
 
 get_offset(Queue, Client, Offset) when is_integer(Offset) ->
     gen_server:call(Queue, {get_offset, Client, Offset});
 get_offset(_Queue, _Client, _Offset) ->
     #{<<"error">> => <<"offset should be a number!">>}.
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Get messages starting from particular "marker" position.
+%% If marker greater than number of messages in queue - get_offset/2 retunrs all messages from queue. 
+%% @spec get_marker(Queue :: pid(), Client :: port(), Marker :: pos_integer()) -> map()
+%% @end
+%%--------------------------------------------------------------------
 
 -spec get_marker(Queue :: pid(), Client :: port(), Marker :: pos_integer()) -> map().
 
@@ -54,6 +87,16 @@ get_marker(Queue, Client, Marker) when Marker >= 0 ->
     gen_server:call(Queue, {get_marker, Client, Marker});
 get_marker(_Queue, _Client, _Marker) ->
     #{<<"error">> => <<"marker should be a positive number!">>}.
+
+%%--------------------------------------------------------------------
+%% @doc
+%% starts queue process. 
+%% Timeout is unused by now. 
+%% @spec start_link(map()) -> {ok, pid()} | {error, Reason :: any()}
+%% @end
+%%--------------------------------------------------------------------
+
+-spec start_link(map()) -> {ok, pid()} | {error, Reason :: any()}.
 
 start_link(#{qname := Name, timeout := Timeout}) when Timeout > 0 ->
     gen_server:start_link(?MODULE, [Name, Timeout], []).

@@ -28,6 +28,13 @@ By default Mhub aquire 2 ports:
 
 TODO: Move port configuration to .config file
 
+Generate souce code Docs
+----------
+
+Edocs available in Markup format. To generate source code documenation type in shell:
+
+      $ make edoc
+
 ## Protocol Overview
 
 Mhub binary protocol is JSON based. 

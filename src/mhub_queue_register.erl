@@ -2,7 +2,8 @@
 %%% @author Dmitry Omelechko <dvarkin@gmail.com>
 %%% @copyright (C) 2016, Dmitry Omelechko
 %%% @doc
-%%%
+%%% Registrate queues. 
+%%% Contain table with BinaryQueue name -> Process pid() identification. 
 %%% @end
 %%% Created : 21 Jul 2016 by Dmitry Omelechko <dvarkin@gmail.com>
 %%%-------------------------------------------------------------------
@@ -25,6 +26,15 @@
 %%%===================================================================
 %%% API
 %%%===================================================================
+
+%%--------------------------------------------------------------------
+%% @doc 
+%% Start new process or return pid() of existing process by Queue Name. 
+%% @spec get(Queue :: binary()) -> pid()
+%% @end
+%%--------------------------------------------------------------------
+
+-spec get(Queue :: binary()) -> pid().
 
 get(Queue) ->
     gen_server:call(?SERVER, {get, Queue}).
