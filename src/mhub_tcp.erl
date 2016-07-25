@@ -38,7 +38,7 @@ init(Ref, Socket, Transport, _Opts = []) ->
 handle_info({tcp, Socket, Data}, State=#state{socket=Socket, transport=Transport}) ->
     %%    error_logger:info_msg("Socket receive msg: ~p~n", [Data]),
     Transport:setopts(Socket, [{active, once}]),
-    R = try mhub:parse(Data, self()) of
+    R = try mhub_protocol:parse(Data, self()) of
 	    Result -> Result
 	catch 
 	    _ -> #{error => <<"Invalid JSON">>, received => Data}

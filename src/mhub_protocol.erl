@@ -6,7 +6,7 @@
 %%% @end
 %%% Created : 21 Jul 2016 by Dmitry Omelechko <dvarkin@gmail.com>
 %%%-------------------------------------------------------------------
--module(mhub).
+-module(mhub_protocol).
 
 -define(PUB, <<"pub">>).
 -define(SUB, <<"sub">>).

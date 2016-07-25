@@ -51,7 +51,7 @@ handle_cast(_Msg, State) ->
     {noreply, State}.
 
 handle_info({udp, Socket, Host, Port, Bin}, State) ->
-    Result = mhub:parse(Bin, self()),
+    Result = mhub_protocol:parse(Bin, self()),
     Binary = jiffy:encode(Result),
     gen_udp:send(Socket, Host, Port, Binary),
     {noreply, State};
